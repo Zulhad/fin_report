@@ -1,0 +1,5 @@
+streamlit
+google-generativeai
+pandas
+st-gsheets-connection
+Pillow
