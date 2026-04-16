@@ -154,13 +154,18 @@ EXTRACT_PROMPT = """
 Anda adalah akuntan ahli. Analisis gambar laporan keuangan HOTEL ROYAL INN ini.
 Ekstrak data per baris transaksi dengan sangat teliti ke format JSON.
 
+ATURAN PENAMAAN KHUSUS:
+- Jika menemukan baris 'SHIFT PAGI' yang memiliki angka Pendapatan, ubah deskripsinya menjadi: "Pendapatan Shift Pagi".
+- Jika menemukan baris 'SHIFT MALAM' yang memiliki angka Pendapatan, ubah deskripsinya menjadi: "Pendapatan Shift Malam".
+- Baris lainnya seperti 'FNB', 'DEBIT', atau 'BELANJA' tetap menggunakan nama aslinya.
+
 PANDUAN PEMETAAN KOLOM:
-1. Shift: Lihat baris 'SHIFT PAGI' atau 'SHIFT MALAM'. Isi kolom shift untuk semua transaksi di bawahnya sampai ketemu baris shift berikutnya.
-2. Description: Ambil teks dari kolom 'KETERANGAN' (contoh: Kamar, FNB, Belanja, Nama orang).
-3. Income: Jika ada angka di kolom 'PENDAPATAN', masukkan ke sini.
+1. Shift: Tentukan 'Pagi' atau 'Malam' berdasarkan letak transaksi tersebut di dokumen.
+2. Description: Gunakan aturan penamaan khusus di atas atau teks dari kolom 'KETERANGAN'.
+3. Income: Jika ada angka di kolom 'PENDAPATAN'.
 4. Expense_debit: Jika ada angka di kolom 'DEBIT/QRIS/TF' di bawah 'PENGELUARAN'.
 5. Expense_cash: Jika ada angka di kolom 'BELANJA/DLL' di bawah 'PENGELUARAN'.
-6. Date & Guest: Cari di bagian atas dokumen (Contoh: "Minggu, 12 April 2026", "63 Guests").
+6. Date & Guest: Cari di bagian atas dokumen.
 
 Format JSON:
 {
