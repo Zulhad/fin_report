@@ -11,10 +11,10 @@ import io
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Rekap Keuangan AI",
-    page_icon="💰",
+    page_title="Hotel Royal Inn Dashboard",
+    page_icon="🏨",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # ── Custom CSS for Premium Dashboard ──────────────────────────────────────────
@@ -90,42 +90,57 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-
-# ── Database setup ────────────────────────────────────────────────────────────
 # ── Database setup ────────────────────────────────────────────────────────────
 DB_PATH = "keuangan.db"
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS transaksi (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            tanggal     TEXT,
-            shift       TEXT,
-            keterangan  TEXT,
-            inc_dq      REAL DEFAULT 0,
-            inc_cdll    REAL DEFAULT 0,
-            exp_dq      REAL DEFAULT 0,
-            exp_cdll    REAL DEFAULT 0,
-            created_at  TEXT DEFAULT (datetime('now','localtime'))
-        )
-    """)
+    # Untuk update skema otomatis di prototype, kita drop jika kolom beda
+    try:
+        c.execute("SELECT guest FROM transaksi LIMIT 1")
+    except:
+        c.execute("DROP TABLE IF EXISTS transaksi")
+        c.execute("""
+            CREATE TABLE transaksi (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                date          TEXT,
+                guest         INTEGER,
+                shift         TEXT,
+                description   TEXT,
+                income        REAL DEFAULT 0,
+                expense_debit REAL DEFAULT 0,
+                expense_cash  REAL DEFAULT 0,
+                created_at    TEXT DEFAULT (datetime('now','localtime'))
+            )
+        """)
     conn.commit()
     conn.close()
-
 
 init_db()
 
 def get_conn():
     return sqlite3.connect(DB_PATH)
 
-def save_transaksi(rows: list[dict]):
+def save_transaksi(rows: list[dict], guest_count: int):
     conn = get_conn()
     c = conn.cursor()
     for r in rows:
         c.execute("""
-            INSERT INTO transaksi (tanggal, shift, keterangan, inc_dq, inc_cdll, exp_dq, exp_cdll)
+            INSERT INTO transaksi (date, guest, shift, description, income, expense_debit, expense_cash)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            r.get("date", ""),
+            guest_count,
+            r.get("shift", ""),
+            r.get("description", ""),
+            float(r.get("income", 0) or 0),
+            float(r.get("expense_debit", 0) or 0),
+            float(r.get("expense_cash", 0) or 0)
+        ))
+    conn.commit()
+    conn.close()
+ INSERT INTO transaksi (tanggal, shift, keterangan, inc_dq, inc_cdll, exp_dq, exp_cdll)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             r.get("date", ""),
@@ -255,21 +270,15 @@ def generate_insight(api_key: str, df: pd.DataFrame) -> str:
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("### ⚙️ Sistem")
-    # Mengambil API Key dari st.secrets secara otomatis
-    try:
-        api_key = st.secrets["OPENAI_API_KEY"]
-        st.success("🤖 AI Engine: OpenAI Active")
-    except:
-        api_key = None
-        st.error("❌ OpenAI API Key tidak ditemukan")
-        st.info("Pastikan OPENAI_API_KEY sudah diatur di .streamlit/secrets.toml.")
+# ── Auth & API Check ──────────────────────────────────────────────────────────
+try:
+    api_key = st.secrets["OPENAI_API_KEY"]
+except:
+    api_key = None
+    st.error("❌ OpenAI API Key tidak ditemukan. Selesaikan pengaturan di secrets.toml.")
 
-    st.divider()
-
-
-    menu = st.radio("Navigasi", ["Upload & Ekstrak", "Review & Simpan", "Database", "AI Insight"])
+# ── Main Tabs ────────────────────────────────────────────────────────────────
+tab_upload, tab_history, tab_insight = st.tabs(["📤 Upload & Verify", "🗄️ Database", "🤖 AI Analytics"])
 
 # ── State init ────────────────────────────────────────────────────────────────
 if "extracted_data" not in st.session_state:
@@ -281,9 +290,8 @@ if "current_file" not in st.session_state:
 # PAGE: UPLOAD & EKSTRAK
 # ══════════════════════════════════════════════════════════════════════════════
 # ── Main Content Area ────────────────────────────────────────────────────────
-if menu == "Upload & Ekstrak":
-    # State reset logic if new file is uploaded
-    uploaded = st.file_uploader("Upload Laporan Keuangan (Scan/Foto)", type=["jpg", "jpeg", "png", "webp"])
+with tab_upload:
+    uploaded = st.file_uploader("Upload Laporan Keuangan (Scan/Foto)", type=["jpg", "jpeg", "png", "webp"], label_visibility="collapsed")
     
     if uploaded:
         col_img, col_proc = st.columns([1, 1], gap="medium")
@@ -322,28 +330,50 @@ if menu == "Upload & Ekstrak":
 
                 # Editable Table
                 df_verify = pd.DataFrame(st.session_state.extracted_data)
+                # Ensure all required columns exist
+                for c in ["income", "expense_debit", "expense_cash"]:
+                    if c not in df_verify.columns: df_verify[c] = 0.0
+
                 edited_df = st.data_editor(
-                    df_verify,
+                    df_verify[["date", "shift", "description", "income", "expense_debit", "expense_cash"]],
                     use_container_width=True,
                     num_rows="dynamic",
                     column_config={
-                        "date": st.column_config.TextColumn("DATE"),
-                        "shift": st.column_config.SelectboxColumn("SHIFT", options=["Pagi", "Malam"]),
-                        "description": st.column_config.TextColumn("DESCRIPTION"),
-                        "inc_dq": st.column_config.NumberColumn("INC (D/QR)"),
-                        "inc_cdll": st.column_config.NumberColumn("INC (C/DLL)"),
-                        "exp_dq": st.column_config.NumberColumn("EXP (D/QR)"),
-                        "exp_cdll": st.column_config.NumberColumn("EXP (C/DLL)"),
+                        "date": st.column_config.TextColumn("Date"),
+                        "shift": st.column_config.SelectboxColumn("Shift", options=["Pagi", "Malam"]),
+                        "description": st.column_config.TextColumn("Description"),
+                        "income": st.column_config.NumberColumn("Income"),
+                        "expense_debit": st.column_config.NumberColumn("Expense (Debit)"),
+                        "expense_cash": st.column_config.NumberColumn("Expense (Cash)"),
                     },
                     hide_index=True
                 )
 
                 st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("✅ Approve & Sync to Database", use_container_width=True, type="primary"):
-                    save_transaksi(edited_df.to_dict(orient="records"))
+                if st.button("✅ Approve & Sync Data", use_container_width=True, type="primary"):
+                    save_transaksi(edited_df.to_dict(orient="records"), st.session_state.metadata.get('guests', 0))
                     st.success("Successfully approved and saved to database!")
                     st.balloons()
                     st.session_state.extracted_data = []
+
+with tab_history:
+    st.markdown("### 🗄️ Master Database")
+    df_history = load_transaksi()
+    if not df_history.empty:
+        st.dataframe(df_history.drop(columns=["id"]), use_container_width=True)
+    else:
+        st.info("Database is empty.")
+
+with tab_insight:
+    st.markdown("### 🤖 AI Insight Analysis")
+    df_ai = load_transaksi()
+    if df_ai.empty:
+        st.info("Upload and save some data first to generate insights.")
+    else:
+        if st.button("✨ Generate Full Analysis", type="primary"):
+            with st.spinner("Analyzing all historical data..."):
+                insight_res = generate_insight(api_key, df_ai)
+                st.markdown(insight_res)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: REVIEW & SIMPAN (Human in the Loop)
