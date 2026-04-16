@@ -17,27 +17,79 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────────
+# ── Custom CSS for Premium Dashboard ──────────────────────────────────────────
 st.markdown("""
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-    .main-header { font-size: 1.6rem; font-weight: 600; margin-bottom: 0.2rem; }
-    .sub-header  { font-size: 0.9rem; color: #888; margin-bottom: 1.5rem; }
-    .card {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 1rem 1.2rem;
-        margin-bottom: 1rem;
-        border: 1px solid #e9ecef;
+    * { font-family: 'Inter', sans-serif; }
+    .main { background-color: #fcfcfc; }
+    
+    /* Header Styling */
+    .header-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 0;
+        border-bottom: 2px solid #f1f5f9;
+        margin-bottom: 2rem;
     }
-    .badge-success { background:#d4edda; color:#155724; padding:3px 10px; border-radius:20px; font-size:12px; }
-    .badge-warning { background:#fff3cd; color:#856404; padding:3px 10px; border-radius:20px; font-size:12px; }
-    .badge-danger  { background:#f8d7da; color:#721c24; padding:3px 10px; border-radius:20px; font-size:12px; }
-    .metric-box { text-align:center; padding:0.8rem; background:#fff; border-radius:8px; border:1px solid #e9ecef; }
-    .metric-val { font-size:1.4rem; font-weight:600; }
-    .metric-lbl { font-size:0.78rem; color:#888; }
-    div[data-testid="stDataFrame"] { border-radius: 8px; overflow: hidden; }
+    .logo-text {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1e293b;
+    }
+    .logo-text span { color: #d97706; }
+    .status-live {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #94a3b8;
+        font-weight: 500;
+        font-size: 14px;
+    }
+    .dot { height: 8px; width: 8px; background-color: #22c55e; border-radius: 50%; display: inline-block; }
+
+    /* Title & Badge */
+    .view-title { font-size: 28px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 15px; }
+    .badge-pending {
+        background: #fef3c7;
+        color: #d97706;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .view-desc { color: #64748b; font-size: 16px; margin-bottom: 2rem; }
+
+    /* Stats Cards */
+    .stats-container { display: flex; gap: 20px; margin-bottom: 2rem; }
+    .stats-card {
+        background: white;
+        padding: 15px 25px;
+        border-radius: 12px;
+        border: 1px solid #f1f5f9;
+        flex: 1;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .stats-label { color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stats-val { color: #1e293b; font-size: 20px; font-weight: 700; margin-top: 5px; }
+
+    /* Buttons */
+    .stButton>button {
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 0.5rem 1rem;
+        transition: all 0.2s;
+    }
+    .btn-approve { background-color: #1e293b !important; color: white !important; width: 100%; border: none; }
 </style>
+
+<div class="header-container">
+    <div class="logo-text">🏨 Hotel <span>Royal Inn</span> Financial Dashboard</div>
+    <div class="status-live"><span class="dot"></span> SYSTEM LIVE</div>
+</div>
 """, unsafe_allow_html=True)
+
 
 # ── Database setup ────────────────────────────────────────────────────────────
 # ── Database setup ────────────────────────────────────────────────────────────
@@ -49,44 +101,44 @@ def init_db():
     c.execute("""
         CREATE TABLE IF NOT EXISTS transaksi (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            tanggal     TEXT NOT NULL,
+            tanggal     TEXT,
             shift       TEXT,
             keterangan  TEXT,
-            kategori    TEXT,
-            tipe_pembayaran TEXT,
-            debit       REAL DEFAULT 0,
-            kredit      REAL DEFAULT 0,
-            sumber_file TEXT,
+            inc_dq      REAL DEFAULT 0,
+            inc_cdll    REAL DEFAULT 0,
+            exp_dq      REAL DEFAULT 0,
+            exp_cdll    REAL DEFAULT 0,
             created_at  TEXT DEFAULT (datetime('now','localtime'))
         )
     """)
     conn.commit()
     conn.close()
 
+
 init_db()
 
 def get_conn():
     return sqlite3.connect(DB_PATH)
 
-def save_transaksi(rows: list[dict], nama_file: str):
+def save_transaksi(rows: list[dict]):
     conn = get_conn()
     c = conn.cursor()
     for r in rows:
         c.execute("""
-            INSERT INTO transaksi (tanggal, shift, keterangan, kategori, tipe_pembayaran, debit, kredit, sumber_file)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO transaksi (tanggal, shift, keterangan, inc_dq, inc_cdll, exp_dq, exp_cdll)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
-            r.get("tanggal", ""),
-            r.get("shift", "Pagi"),
-            r.get("keterangan", ""),
-            r.get("kategori", ""),
-            r.get("tipe_pembayaran", "Tunai"),
-            float(r.get("debit", 0) or 0),
-            float(r.get("kredit", 0) or 0),
-            nama_file
+            r.get("date", ""),
+            r.get("shift", ""),
+            r.get("description", ""),
+            float(r.get("inc_dq", 0) or 0),
+            float(r.get("inc_cdll", 0) or 0),
+            float(r.get("exp_dq", 0) or 0),
+            float(r.get("exp_cdll", 0) or 0)
         ))
     conn.commit()
     conn.close()
+
 
 def load_transaksi(limit=None) -> pd.DataFrame:
     conn = get_conn()
@@ -99,27 +151,35 @@ def load_transaksi(limit=None) -> pd.DataFrame:
 
 # ── OpenAI OCR ────────────────────────────────────────────────────────────────
 EXTRACT_PROMPT = """
-Kamu adalah asisten ekstraksi data keuangan hotel. Analisa gambar laporan kasir ini.
-Ekstrak SEMUA transaksi dengan format JSON array:
+Analisis gambar laporan keuangan hotel ini. Ekstrak data per baris transaksi ke dalam format JSON.
+Pisahkan nilai berdasarkan 4 kategori uang ini:
+1. INC (D/QR): Pendapatan Non-Tunai (Debit/QRIS/TF).
+2. INC (C/DLL): Pendapatan Tunai (Kamar, F&B, dll).
+3. EXP (D/QR): Pengeluaran/Koreksi Non-Tunai (biasanya di kolom pengeluaran DEBIT).
+4. EXP (C/DLL): Pengeluaran Belanja Tunai (Operasional).
+
+Ekstrak juga 'report_date' dan 'guest_count' dari bagian atas dokumen.
+
+Format JSON:
 {
+  "report_date": "Minggu, 12 April 2026",
+  "guest_count": 63,
   "transaksi": [
     {
-      "tanggal": "YYYY-MM-DD",
-      "shift": "Pagi atau Malam",
-      "keterangan": "deskripsi item",
-      "kategori": "Kamar, F&B, Operasional, Selisih, atau Lain-lain",
-      "tipe_pembayaran": "Tunai atau Non-Tunai",
-      "debit": 0,
-      "kredit": 0
+      "date": "Minggu, 12 April 2026",
+      "shift": "Pagi/Malam",
+      "description": "Deskripsi transaksi",
+      "inc_dq": 0,
+      "inc_cdll": 0,
+      "exp_dq": 0,
+      "exp_cdll": 0
     }
   ]
 }
-Aturan:
-- Debit = Pengeluaran / Non-Tunai yang mengurangi kas fisik.
-- Kredit = Pemasukan (Kamar, F&B, dll).
 """
 
-def ocr_dengan_openai(api_key: str, image_bytes: bytes) -> list[dict]:
+
+def ocr_dengan_openai(api_key: str, image_bytes: bytes) -> dict:
     client = OpenAI(api_key=api_key)
     base64_image = base64.b64encode(image_bytes).decode('utf-8')
     
@@ -129,7 +189,7 @@ def ocr_dengan_openai(api_key: str, image_bytes: bytes) -> list[dict]:
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": EXTRACT_PROMPT + "\nKembalikan HANYA JSON object dengan key 'transaksi'."},
+                    {"type": "text", "text": EXTRACT_PROMPT},
                     {
                         "type": "image_url",
                         "image_url": {
@@ -142,9 +202,7 @@ def ocr_dengan_openai(api_key: str, image_bytes: bytes) -> list[dict]:
         temperature=0,
         response_format={"type": "json_object"}
     )
-    
-    res_json = json.loads(response.choices[0].message.content)
-    return res_json.get("transaksi", [])
+    return json.loads(response.choices[0].message.content)
 
 
 
@@ -222,56 +280,70 @@ if "current_file" not in st.session_state:
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: UPLOAD & EKSTRAK
 # ══════════════════════════════════════════════════════════════════════════════
+# ── Main Content Area ────────────────────────────────────────────────────────
 if menu == "Upload & Ekstrak":
-    st.markdown('<div class="main-header">📤 Upload Laporan Keuangan</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">Upload foto atau scan laporan keuangan untuk diekstrak otomatis</div>', unsafe_allow_html=True)
+    # State reset logic if new file is uploaded
+    uploaded = st.file_uploader("Upload Laporan Keuangan (Scan/Foto)", type=["jpg", "jpeg", "png", "webp"])
+    
+    if uploaded:
+        col_img, col_proc = st.columns([1, 1], gap="medium")
+        with col_img:
+            st.image(uploaded, use_container_width=True)
+            if st.button("🔍 Run AI Extraction", type="primary", use_container_width=True):
+                with st.spinner("AI is analyzing the scan..."):
+                    try:
+                        res = ocr_dengan_openai(api_key, uploaded.read())
+                        st.session_state.extracted_data = res.get("transaksi", [])
+                        st.session_state.metadata = {
+                            "date": res.get("report_date", "Unknown"),
+                            "guests": res.get("guest_count", 0)
+                        }
+                    except Exception as e:
+                        st.error(f"Error: {e}")
 
-    col1, col2 = st.columns([1, 1], gap="large")
+        with col_proc:
+            if st.session_state.extracted_data:
+                # Premium Header for Verification
+                st.markdown(f"""
+                <div class="view-title">Data Verification <span class="badge-pending">Pending Review</span></div>
+                <div class="view-desc">Review and correct the data extracted from the scan before final submission.</div>
+                
+                <div class="stats-container">
+                    <div class="stats-card">
+                        <div class="stats-label">Report Date</div>
+                        <div class="stats-val">{st.session_state.metadata.get('date')}</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-label">Guest Count</div>
+                        <div class="stats-val">{st.session_state.metadata.get('guests')} Guests</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
-    with col1:
-        uploaded = st.file_uploader(
-            "Pilih gambar laporan",
-            type=["jpg", "jpeg", "png", "webp"],
-            help="Format: JPG, PNG, WEBP"
-        )
-        if uploaded:
-            st.image(uploaded, caption=uploaded.name, use_column_width=True)
-            st.session_state.current_file = uploaded.name
+                # Editable Table
+                df_verify = pd.DataFrame(st.session_state.extracted_data)
+                edited_df = st.data_editor(
+                    df_verify,
+                    use_container_width=True,
+                    num_rows="dynamic",
+                    column_config={
+                        "date": st.column_config.TextColumn("DATE"),
+                        "shift": st.column_config.SelectboxColumn("SHIFT", options=["Pagi", "Malam"]),
+                        "description": st.column_config.TextColumn("DESCRIPTION"),
+                        "inc_dq": st.column_config.NumberColumn("INC (D/QR)"),
+                        "inc_cdll": st.column_config.NumberColumn("INC (C/DLL)"),
+                        "exp_dq": st.column_config.NumberColumn("EXP (D/QR)"),
+                        "exp_cdll": st.column_config.NumberColumn("EXP (C/DLL)"),
+                    },
+                    hide_index=True
+                )
 
-    with col2:
-        if uploaded:
-            st.markdown("#### Detail file")
-            st.markdown(f"""
-            <div class="card">
-                <b>Nama file:</b> {uploaded.name}<br>
-                <b>Ukuran:</b> {uploaded.size/1024:.1f} KB<br>
-                <b>Tipe:</b> {uploaded.type}
-            </div>
-            """, unsafe_allow_html=True)
-
-            if not api_key:
-                st.warning("Masukkan Gemini API Key di sidebar untuk mulai ekstraksi.")
-            else:
-                if st.button("🔍 Ekstrak Data dengan AI", type="primary", use_container_width=True):
-                    with st.spinner("AI sedang membaca laporan keuangan..."):
-                        try:
-                            img_bytes = uploaded.read()
-                            data = ocr_dengan_openai(api_key, img_bytes)
-                            st.session_state.extracted_data = data
-                            if data:
-                                st.success(f"✅ Berhasil mengekstrak {len(data)} transaksi!")
-                            else:
-                                st.warning("Tidak ditemukan data transaksi. Coba gambar yang lebih jelas.")
-                        except json.JSONDecodeError:
-                            st.error("Gagal parse JSON dari AI. Coba lagi atau gunakan gambar berbeda.")
-                        except Exception as e:
-                            st.error(f"Error: {e}")
-
-        if st.session_state.extracted_data:
-            st.markdown("#### Hasil ekstraksi (preview)")
-            df_preview = pd.DataFrame(st.session_state.extracted_data)
-            st.dataframe(df_preview, use_container_width=True, height=280)
-            st.info("👉 Buka **Review & Simpan** untuk verifikasi sebelum menyimpan ke database.")
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("✅ Approve & Sync to Database", use_container_width=True, type="primary"):
+                    save_transaksi(edited_df.to_dict(orient="records"))
+                    st.success("Successfully approved and saved to database!")
+                    st.balloons()
+                    st.session_state.extracted_data = []
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: REVIEW & SIMPAN (Human in the Loop)
