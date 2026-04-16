@@ -151,28 +151,29 @@ def load_transaksi(limit=None) -> pd.DataFrame:
 
 # ── OpenAI OCR ────────────────────────────────────────────────────────────────
 EXTRACT_PROMPT = """
-Analisis gambar laporan keuangan hotel ini. Ekstrak data per baris transaksi ke dalam format JSON.
-Pisahkan nilai berdasarkan 4 kategori uang ini:
-1. INC (D/QR): Pendapatan Non-Tunai (Debit/QRIS/TF).
-2. INC (C/DLL): Pendapatan Tunai (Kamar, F&B, dll).
-3. EXP (D/QR): Pengeluaran/Koreksi Non-Tunai (biasanya di kolom pengeluaran DEBIT).
-4. EXP (C/DLL): Pengeluaran Belanja Tunai (Operasional).
+Anda adalah akuntan ahli. Analisis gambar laporan keuangan HOTEL ROYAL INN ini.
+Ekstrak data per baris transaksi dengan sangat teliti ke format JSON.
 
-Ekstrak juga 'report_date' dan 'guest_count' dari bagian atas dokumen.
+PANDUAN PEMETAAN KOLOM:
+1. Shift: Lihat baris 'SHIFT PAGI' atau 'SHIFT MALAM'. Isi kolom shift untuk semua transaksi di bawahnya sampai ketemu baris shift berikutnya.
+2. Description: Ambil teks dari kolom 'KETERANGAN' (contoh: Kamar, FNB, Belanja, Nama orang).
+3. Income: Jika ada angka di kolom 'PENDAPATAN', masukkan ke sini.
+4. Expense_debit: Jika ada angka di kolom 'DEBIT/QRIS/TF' di bawah 'PENGELUARAN'.
+5. Expense_cash: Jika ada angka di kolom 'BELANJA/DLL' di bawah 'PENGELUARAN'.
+6. Date & Guest: Cari di bagian atas dokumen (Contoh: "Minggu, 12 April 2026", "63 Guests").
 
 Format JSON:
 {
-  "report_date": "Minggu, 12 April 2026",
-  "guest_count": 63,
+  "report_date": "...",
+  "guest_count": 0,
   "transaksi": [
     {
-      "date": "Minggu, 12 April 2026",
+      "date": "...",
       "shift": "Pagi/Malam",
-      "description": "Deskripsi transaksi",
-      "inc_dq": 0,
-      "inc_cdll": 0,
-      "exp_dq": 0,
-      "exp_cdll": 0
+      "description": "...",
+      "income": 0,
+      "expense_debit": 0,
+      "expense_cash": 0
     }
   ]
 }
@@ -184,7 +185,7 @@ def ocr_dengan_openai(api_key: str, image_bytes: bytes) -> dict:
     base64_image = base64.b64encode(image_bytes).decode('utf-8')
     
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",  # Upgrade to FLAGSHIP model for high accuracy
         messages=[
             {
                 "role": "user",
